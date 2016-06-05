@@ -51,7 +51,7 @@ class MainForm(Tk):
         self.panel_results = LabelFrame(self, text="Results")
         self.results = ScrollableControlBecauseTkinterIsAShitTechnology(self.panel_results)
         self.results.grid(row=3)
-        self.panel_results.grid(row=3, column=0, columnspan=2)
+        self.panel_results.grid(row=3, column=0, columnspan=2, sticky=N + S + E + W)
 
         # Setup the form to be universally resizable
         MainForm.setup_resizable(self)
@@ -117,16 +117,15 @@ class MainForm(Tk):
 
 class ScrollableControlBecauseTkinterIsAShitTechnology(Frame):
     def __init__(self, root):
-
         Frame.__init__(self, root)
-        self.canvas = Canvas(root, borderwidth=0, background="#ffffff")
-        self.frame = Frame(self.canvas, background="#ffffff")
+        self.canvas = Canvas(root, borderwidth=0)
+        self.frame = Frame(self.canvas)
         self.vsb = Scrollbar(root, orient="vertical", command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.vsb.set)
 
-        self.vsb.grid(row=0, sticky=N+S+E)
-        self.canvas.grid(row=0, sticky=N+S+E+W)
-        self.canvas.create_window((4,4), window=self.frame, anchor="nw",
+        self.vsb.grid(row=0, sticky=N + S + E)
+        self.canvas.grid(row=0, sticky=N + S + E + W)
+        self.canvas.create_window((4, 4), window=self.frame, anchor="nw",
                                   tags="self.frame")
 
         self.frame.bind("<Configure>", self.onFrameConfigure)
@@ -137,8 +136,8 @@ class ScrollableControlBecauseTkinterIsAShitTechnology(Frame):
         '''Put in some fake data'''
         for row in range(100):
             Label(self.frame, text="%s" % row, width=3, borderwidth="1",
-                     relief="solid").grid(row=row, column=0)
-            t="this is the second column for row %s" %row
+                  relief="solid").grid(row=row, column=0)
+            t = "this is the second column for row %s" % row
             Label(self.frame, text=t).grid(row=row, column=1)
 
     def onFrameConfigure(self, event):
