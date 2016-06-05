@@ -11,7 +11,8 @@ def on_login():
     access_info = reddit.login_first_time(main_form.entry_access_token.get())
 
     if access_info is not None:
-        main_form.setup_state(main_form.login_panel, tkinter.DISABLED)
+        main_form.setup_state(main_form.panel_login, tkinter.DISABLED)
+        main_form.label_current_user.configure(text=reddit.api.get_me())
 
 
 # Create reddit client
@@ -26,7 +27,8 @@ main_form.button_login.configure(command=on_login)
 
 # Attempt to use previously entered user information
 if reddit.is_logged_in():
-    main_form.setup_state(main_form.login_panel, tkinter.DISABLED)
+    main_form.setup_state(main_form.panel_login, tkinter.DISABLED)
+    main_form.label_current_user.configure(text=reddit.api.get_me())
 
 # Show form
 main_form.show()

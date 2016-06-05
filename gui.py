@@ -7,18 +7,27 @@ class MainForm(Tk):
         Tk.__init__(self)
 
         # Log in panel
-        self.login_panel = LabelFrame(self, text="Login", padx=5, pady=5)
-        Label(self.login_panel, text="Token:").grid(row=0, column=0)
-        self.entry_access_token = Entry(self.login_panel)
+        self.panel_login = LabelFrame(self, text="Login", padx=5, pady=5)
+        Label(self.panel_login, text="Token:").grid(row=0, column=0)
+        self.entry_access_token = Entry(self.panel_login)
         self.entry_access_token.grid(row=0, column=1, sticky=E + W)
-        self.button_get_token = Button(self.login_panel, text="Get Token")
-        self.button_get_token.grid(row=1, column=0)
-        self.button_login = Button(self.login_panel, text="Log In")
-        self.button_login.grid(row=1, column=1)
-        self.login_panel.grid(sticky=E + W)
+        self.button_get_token = Button(self.panel_login, text="Get Token")
+        self.button_get_token.grid(row=1, column=1, sticky=E)
+        self.button_login = Button(self.panel_login, text="Log In")
+        self.button_login.grid(row=1, column=1, sticky=W)
+        self.panel_login.grid(sticky=E + W)
 
-        # Setup the form to be resizable
+        # User panel
+        self.panel_current_user = LabelFrame(self, text="Authenticated User", padx=5, pady=5)
+        self.label_current_user = Label(self.panel_current_user, text="")
+        self.label_current_user.grid(column=0, row=0, sticky=W)
+        self.panel_current_user.grid(sticky=E + W)
+
+        # Setup the form to be universally resizable
         MainForm.setup_resizable(self)
+
+        # Specifically override
+        Grid.columnconfigure(self.panel_login, 0, weight=0)
 
     @staticmethod
     def setup_resizable(control):
