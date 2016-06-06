@@ -1,6 +1,60 @@
 import praw
 import os
 import pickle
+import multiprocessing
+import threading
+
+
+class RedditProxy:
+    """
+    A proxy for interacting with the RedditClient in another process.
+    """
+
+    def __init__(self, user_data_filename):
+        """
+        Initializes a new instance of the RedditProxy class.
+        :param user_data_filename: The file that should be created or read in with user data.
+        """
+        # Two queues, one for requests and one for responses.
+        self.producer_queue = multiprocessing.Queue()
+        self.consumer_queue = multiprocessing.Queue()
+
+        # Create the producer in a different process.
+        self.producer = multiprocessing.Process(target=self.producer_main,
+                                                args=(self.producer_queue, self.consumer_queue, user_data_filename))
+        self.producer.daemon = True
+        self.producer.start()
+
+        # Create the consumer in the same process for retrieving responses async.
+        self.consumer = threading.Thread(target=self.consumer_main, args=(self.consumer_queue,))
+        self.consumer.daemon = True
+        self.consumer.start()
+
+    def producer_main(self, request_queue, response_queue, user_data_filename):
+        """
+        The main method for the RedditProxy in a seperate method. Used to make calls to the RedditClient class.
+        :param request_queue: The queue we will receive requests on.
+        :param response_queue: The queue we will use to respond.
+        :param user_data_filename: The data file that contains existing user data.
+        """
+        reddit = RedditClient(user_data_filename)
+
+        while True:
+            message = request_queue.get()
+
+            if message is None:
+                break
+
+    def consumer_main(self, queue):
+        """
+        The main method for the RedditProxy in a seperate method. Used to make calls to the RedditClient class.
+        :param queue: The queue we will receive responses on.
+        """
+        while True:
+            message = queue.get()
+
+            if message is None:
+                break
 
 
 class RedditClient:
@@ -10,7 +64,7 @@ class RedditClient:
 
     def __init__(self, user_data_filename):
         """
-        Initializes a new instance of the Reddit_Client class.
+        Initializes a new instance of the RedditClient class.
         :param user_data_filename: The file that should be created or read in with user data.
         """
         # The Reddit API instance
