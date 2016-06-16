@@ -50,6 +50,7 @@ class MainForm(Tk):
         self.button_login = Button(self.panel_login, text="Log In")
         self.button_login.grid(row=1, column=1, sticky=W)
         self.panel_login.grid(row=0, columnspan=3, sticky=E + W)
+        setup_state(self.panel_login, DISABLED)
 
         # User panel
         self.panel_current_user = LabelFrame(self, text="Authenticated User", padx=5, pady=5)

@@ -5,15 +5,43 @@ import praw
 from constants import *
 
 
-def on_login():
+def on_button_login_click():
     """
-    Handles logging into Reddit.
+    Handles clicking the login button.
     """
-    access_info = reddit.login_first_time(main_form.entry_access_token.get())
+    # Disable to login panel to avoid someone clicking it again
+    gui.setup_state(main_form.panel_login, tkinter.DISABLED)
 
-    if access_info is not None:
-        main_form.setup_state(main_form.panel_login, tkinter.DISABLED)
-        main_form.label_current_user.configure(text=reddit.api.get_me())
+    # Asynchronously login
+    reddit.login_first_time(main_form.entry_access_token.get())
+
+
+def on_login_first_time(is_logged_in):
+    """
+    Handles an attempt to login.
+    :param is_logged_in: True if logged in, false otherwise.
+    """
+    # If we're not logged in set the background color of the token to red since it's the problem.
+    if not is_logged_in:
+        gui.setup_state(main_form.panel_login, tkinter.NORMAL)
+        main_form.entry_access_token.configure(bg="red")
+
+    # Perform the remainder of the GUI updates
+    on_is_logged_in(is_logged_in)
+
+
+def on_is_logged_in(is_logged_in):
+    """
+    Handles responding to the login state of the reddit client changing.
+    :param is_logged_in: True if logged in, false otherwise.
+    """
+    if is_logged_in:
+        main_form.entry_access_token.configure(bg="white")
+        gui.setup_state(main_form.panel_login, tkinter.DISABLED)
+        reddit.get_me()
+    else:
+        gui.setup_state(main_form.panel_login, tkinter.NORMAL)
+        main_form.label_current_user.configure(text="")
 
 
 def on_get():
@@ -107,22 +135,21 @@ def on_execute():
 
 
 if __name__ == "__main__":
-    # Create reddit client
-    reddit = reddit_client.RedditProxy(user_data_file)
-
     # Create main form
     main_form = gui.MainForm()
 
     # Attach delegates
-    # main_form.button_get_token.configure(command=lambda: reddit.launch_authorization_page())
-    main_form.button_login.configure(command=on_login)
+    main_form.button_get_token.configure(command=lambda: reddit.launch_authorization_page())
+    main_form.button_login.configure(command=on_button_login_click)
     main_form.button_get.configure(command=on_get)
     main_form.button_execute.configure(command=on_execute)
 
-    # Attempt to use previously entered user information
-    # if reddit.is_logged_in():
-    #     gui.setup_state(main_form.panel_login, tkinter.DISABLED)
-    #     main_form.label_current_user.configure(text=reddit.api.get_me())
+    # Create reddit client
+    reddit = reddit_client.RedditProxy(user_data_file)
+    reddit.add_callback("is_logged_in", on_is_logged_in)
+    reddit.add_callback("login_first_time", on_login_first_time)
+    reddit.add_callback("get_me", lambda username: main_form.label_current_user.configure(text=username))
+    reddit.is_logged_in()
 
     # Show form
     main_form.show()
