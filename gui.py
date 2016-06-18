@@ -113,6 +113,7 @@ class MainForm(Tk):
 
         # Default values
         self.radiobutton_action_type.set("1")
+        self.radiobutton_action.set("2")
 
     def set_action_label(self):
         """
@@ -187,10 +188,25 @@ class ScrollableControlBecauseTkinterIsAShitTechnology(Frame):
         :param text: The text of the label to add.
         :return: The created control.
         """
+        # Sanitize the text
+        text = text.replace("\r", " ").replace("\n", " ").encode("ascii", "ignore")
+
         label = Label(self.frame, text=text)
         label.grid(row=len(self.frame.children), stick=W)
         setup_resizable(self.frame)
         return label
+
+    def get_content(self, query):
+        """
+        Gets added content that matches a given query.
+        :param query: The query.
+        :return: The first instance of a given query, none if nothing is found.
+        """
+        for child in self.frame.children.values():
+            if query(child):
+                return child
+
+        return None
 
     def clear(self):
         """
