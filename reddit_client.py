@@ -114,6 +114,71 @@ class RedditClient:
         except:
             return None
 
+    def get_user(self, username, get_posts, get_comments):
+        """
+        Gets information about a user.
+        :param username: The username to query.
+        :param get_posts: True if posts should be retrieved, false otherwise.
+        :param get_comments: True if comments should be retrieved, false otherwise.
+        :return: An object of user information.
+        """
+        if username is None:
+            return
+
+        # Get the user object
+        user = self.api.get_redditor(username)
+
+        if get_posts:
+            user.posts = list(user.get_submitted(sort="new", time="all", limit=None))
+
+        if get_comments:
+            user.all_comments = list(user.get_comments(sort="new", time="all", limit=None))
+
+        return user
+
+    def get_post(self, post_id, get_comments):
+        """
+        Gets information about a submission.
+        :param post_id: The submission identifier.
+        :param get_comments: True if comments should be retrieved, false otherwise.
+        :return: An object of submission information.
+        """
+        post = self.api.get_submission(submission_id=post_id)
+
+        if get_comments:
+            post.replace_more_comments(limit=None, threshold=0)
+            post.all_comments = praw.helpers.flatten_tree(post.comments)
+
+        return post
+
+    def vote(self, upvote, all_content, callback=None):
+        """
+        Upvotes a list of content.
+        :param upvote: True to upvote, false to downvote.
+        :param all_content: The list of content.
+        :param callback: The callback to call to report the status of each status item.
+        """
+        for item in all_content:
+            try:
+                # We have to retrieve the item fresh since this was serialized.
+                item = self.api.get_info(thing_id=item.name)
+
+                # Upvote or downvote the content.
+                if upvote is None:
+                    item.clear_vote()
+                elif upvote:
+                    item.upvote()
+                else:
+                    item.downvote()
+
+                # If there is something to call, report success.
+                if callable(callback):
+                    callback(item, True)
+            except:
+                # If there is something to call, report failure.
+                if callable(callback):
+                    callback(item, False)
+
 
 class EmbeddedProxy:
     def __init__(self, user_data_filename):
@@ -146,21 +211,23 @@ class EmbeddedProxy:
         """
         self.producer_queue.put({"name": name, "args": args, "params": params})
 
-    def add_callback(self, name, callback):
+    def add_callback(self, name, callback, calls=None):
         """
         Adds a callback associated with an asynchronous return value.
         :param name: The name or identifier of the callback. This is nominally the method name.
         :param callback: The callback to pass the return value to.
+        :param calls: The number of times to call the callback. If None it will be called an infinite number of times.
         """
         if not callable(callback):
             logger.log("EmbeddedProxy.add_callback: Attempt to add un-callable data type to callback list.")
             return
 
         # Either create the list if it doesn't exist or add to the existing list.
+        item = {"callback": callback, "calls": calls}
         if name not in self.callbacks:
-            self.callbacks[name] = [callback]
+            self.callbacks[name] = [item]
         else:
-            self.callbacks[name].append(callback)
+            self.callbacks[name].append(item)
 
     def remove_callback(self, name, callback):
         """
@@ -176,8 +243,9 @@ class EmbeddedProxy:
         callback_list = self.callbacks[name]
 
         # If the callback is in the callback list, remove it.
-        if callback in callback_list:
-            callback_list.remove(callback)
+        for entry in callback_list:
+            if entry["callback"] == callback:
+                callback_list.remove(entry)
 
         # If what we deleted was the last thing in the list, remove the callback list from the master collection.
         if len(callback_list) == 0:
@@ -191,7 +259,7 @@ class EmbeddedProxy:
         :param user_data_filename: The data file that contains existing user data.
         """
         # Create the reddit object we will use for the remainder of the simulation.
-        reddit = RedditClient(user_data_filename)
+        self.reddit = RedditClient(user_data_filename)
 
         while True:
             # Passively wait for a request.
@@ -207,11 +275,23 @@ class EmbeddedProxy:
                 continue
 
             # Try to get the method we're supposed to call.
-            method = getattr(reddit, message["name"])
+            method = None
+            try:
+                method = getattr(self, message["name"])
+            except:
+                pass
+
             if not callable(method):
-                logger.log("EmbeddedProxy.producer_main: Error the following method was not found \"", message["name"],
-                           "\"", end="")
-                continue
+                try:
+                    method = getattr(self.reddit, message["name"])
+                except:
+                    pass
+
+                if not callable(method):
+                    logger.log("EmbeddedProxy.producer_main: Error the following method was not found \"",
+                               message["name"],
+                               "\"", end="")
+                    continue
 
             # Call the method.
             ret = None
@@ -262,17 +342,61 @@ class EmbeddedProxy:
             # Perform each callback.
             callbacks = self.callbacks[name]
             for callback in callbacks:
+                # Perform callback.
                 try:
                     if has_ret:
-                        callback(ret)
+                        callback["callback"](ret)
                     else:
-                        callback()
+                        callback["callback"]()
                 except Exception as ex:
                     logger.log("EmbeddedProxy.consumer_main: Caught the following exception during method invocation: ",
                                ex, end="")
 
+                # If this callback has a finite number of calls.
+                calls = callback["calls"]
+                if calls is not None:
+                    # Decrement the number of calls.
+                    calls -= 1
+                    if calls <= 0:
+                        # If we've run out of calls remove it from the list.
+                        self.remove_callback(name, callback["callback"])
+                    else:
+                        # Save the new value.
+                        callback["calls"] = calls
 
-class RedditProxy(RedditClient):
+    def vote(self, upvote, all_content, callback=None):
+        """
+        Used as a pass through to the RedditClient vote method. This is called on the main process (consumer process).
+        In order to preserve any state from main process a special callback is placed on in the callback list and the
+        producer process is informed to tell the main process when to call this special callback.
+        :param upvote: True to upvote, false to downvote.
+        :param all_content: The list of content.
+        :param callback: The callback to call to report the status of each status item.
+        """
+        # If there is no callback, just do it like normal.
+        if callback is None:
+            self.add_command("vote", upvote, all_content)
+            return
+
+        # Add a callback in the consumer process to call the passed in callback as a result of execution on the
+        # producer. Must be keyed with the content name to avoid overlapping with subsequent calls to vote.
+        for content in all_content:
+            self.add_callback("consumer_vote_" + content.name, lambda ret: callback(ret[0], ret[1]), 1)
+
+        # Add the command to the producer queue.
+        self.add_command("producer_vote", upvote, all_content)
+
+    def producer_vote(self, upvote, all_content):
+        """
+        A special method used by the producer process to vote.
+        :param upvote: True to upvote, false to downvote.
+        :param all_content: The list of content.
+        """
+        self.reddit.vote(upvote, all_content, lambda entry, success: self.consumer_queue.put(
+            {"name": "consumer_vote_" + entry.name, "return": [entry, success]}))
+
+
+class RedditProxy(RedditClient, EmbeddedProxy):
     """
     A proxy for interacting with the RedditClient in another process.
     """
@@ -291,22 +415,22 @@ class RedditProxy(RedditClient):
         :return: The method.
         """
 
-        # If the method is from our proxied object then marshall the call to the "add_command" method.
-        if hasattr(RedditClient, name):
-            method = getattr(object.__getattribute__(self, "_obj"), "add_command")
+        # If the method is from our proxied object then call it first.
+        if hasattr(EmbeddedProxy, name):
+            return getattr(object.__getattribute__(self, "_obj"), name)
 
-            if method is None:
-                return
+        # Otherwise, add the call to the queue
+        method = getattr(object.__getattribute__(self, "_obj"), "add_command")
 
-            return lambda *args, **params: method(name, *args, **params)
+        if method is None:
+            return
 
-        # Otherwise just get the method directly.
-        return getattr(object.__getattribute__(self, "_obj"), name)
+        return lambda *args, **params: method(name, *args, **params)
 
     def __delattr__(self, name):
         """
         Used as a pass through to the underlying object.
-        :param name: The name of the attribute.
+        :param name: The name of the attribute./
         """
         delattr(object.__getattribute__(self, "_obj"), name)
 
