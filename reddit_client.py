@@ -122,19 +122,22 @@ class RedditClient:
         :param get_comments: True if comments should be retrieved, false otherwise.
         :return: An object of user information.
         """
-        if username is None:
+        if username is None or username == "":
             return
 
-        # Get the user object
-        user = self.api.get_redditor(username)
+        try:
+            # Get the user object
+            user = self.api.get_redditor(username)
 
-        if get_posts:
-            user.posts = list(user.get_submitted(sort="new", time="all", limit=None))
+            if get_posts:
+                user.posts = list(user.get_submitted(sort="new", time="all", limit=None))
 
-        if get_comments:
-            user.all_comments = list(user.get_comments(sort="new", time="all", limit=None))
+            if get_comments:
+                user.all_comments = list(user.get_comments(sort="new", time="all", limit=None))
 
-        return user
+            return user
+        except:
+            return None
 
     def get_post(self, post_id, get_comments):
         """
@@ -143,13 +146,16 @@ class RedditClient:
         :param get_comments: True if comments should be retrieved, false otherwise.
         :return: An object of submission information.
         """
-        post = self.api.get_submission(submission_id=post_id)
+        try:
+            post = self.api.get_submission(submission_id=post_id)
 
-        if get_comments:
-            post.replace_more_comments(limit=None, threshold=0)
-            post.all_comments = praw.helpers.flatten_tree(post.comments)
+            if get_comments:
+                post.replace_more_comments(limit=None, threshold=0)
+                post.all_comments = praw.helpers.flatten_tree(post.comments)
 
-        return post
+            return post
+        except:
+            return None
 
     def vote(self, upvote, all_content, callback=None):
         """
@@ -186,6 +192,8 @@ class EmbeddedProxy:
         Initializes a new instance of the RedditProxy class.
         :param user_data_filename: The file that should be created or read in with user data.
         """
+        self.reddit = None
+
         # Two queues, one for requests and one for responses.
         self.producer_queue = multiprocessing.Queue()
         self.consumer_queue = multiprocessing.Queue()
@@ -289,8 +297,7 @@ class EmbeddedProxy:
 
                 if not callable(method):
                     logger.log("EmbeddedProxy.producer_main: Error the following method was not found \"",
-                               message["name"],
-                               "\"", end="")
+                               message["name"], "\"", sep="")
                     continue
 
             # Call the method.
@@ -309,7 +316,7 @@ class EmbeddedProxy:
                     ret = method()
             except Exception as ex:
                 logger.log("EmbeddedProxy.producer_main: Caught the following exception during method invocation: ", ex,
-                           end="")
+                           sep="")
 
             # Put the response on the response queue for the other process.
             response_queue.put({"name": message["name"], "return": ret})
@@ -350,7 +357,7 @@ class EmbeddedProxy:
                         callback["callback"]()
                 except Exception as ex:
                     logger.log("EmbeddedProxy.consumer_main: Caught the following exception during method invocation: ",
-                               ex, end="")
+                               ex, sep="")
 
                 # If this callback has a finite number of calls.
                 calls = callback["calls"]

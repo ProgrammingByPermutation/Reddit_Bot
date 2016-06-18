@@ -76,6 +76,11 @@ def on_get_user(user):
     Writes all user data to the form.
     :param user: The user data.
     """
+    if user is None:
+        main_form.results.add_content("User not found!")
+        enable_actions()
+        return
+
     # Write all the posts to the screen.
     main_form.results.add_title("POSTS")
     if user.posts is not None:
@@ -102,6 +107,11 @@ def on_get_post(post):
     Writes all post data to the form.
     :param post: The post data.
     """
+    if post is None:
+        main_form.results.add_content("Post not found!")
+        enable_actions()
+        return
+
     # Write all comments to the screen.
     main_form.results.add_title("COMMENTS")
     if post.all_comments is not None:
@@ -162,6 +172,11 @@ def on_execute_user(user):
     Handles response from the execute user request.
     :param user: The user data.
     """
+    if user is None:
+        main_form.results.add_content("User not found!")
+        enable_actions()
+        return
+
     on_get_user(user)
     if main_form.radiobutton_action.get() == gui.Action.Upvote.value:
         reddit.vote(True, user.posts, on_vote)
@@ -179,6 +194,11 @@ def on_execute_post(post):
     Handles the response from the execute post request.
     :param post: The post data.
     """
+    if post is None:
+        main_form.results.add_content("Post not found!")
+        enable_actions()
+        return
+
     on_get_post(post)
     if main_form.radiobutton_action.get() == gui.Action.Upvote.value:
         reddit.vote(True, post.all_comments, on_vote)
