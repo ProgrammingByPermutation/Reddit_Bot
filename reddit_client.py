@@ -1,8 +1,12 @@
-import praw
+import math
+import multiprocessing
 import os
 import pickle
-import multiprocessing
 import threading
+
+import praw
+import praw.handlers
+
 import logger
 
 
@@ -187,23 +191,28 @@ class RedditClient:
 
 
 class EmbeddedProxy:
-    def __init__(self, user_data_filename):
+    def __init__(self, user_data_filename, producer_processes):
         """
         Initializes a new instance of the RedditProxy class.
         :param user_data_filename: The file that should be created or read in with user data.
+        :param producer_processes: The number of producer processes to make reddit requests with.
         """
         self.reddit = None
+        self.producer_processes = producer_processes
 
         # Two queues, one for requests and one for responses.
         self.producer_queue = multiprocessing.Queue()
         self.consumer_queue = multiprocessing.Queue()
         self.callbacks = {}
 
-        # Create the producer in a different process.
-        self.producer = multiprocessing.Process(target=self.producer_main,
-                                                args=(self.producer_queue, self.consumer_queue, user_data_filename))
-        self.producer.daemon = True
-        self.producer.start()
+        # Create a list of producers in different processes.
+        self.producers = []
+        for x in range(producer_processes):
+            producer = multiprocessing.Process(target=self.producer_main,
+                                               args=(self.producer_queue, self.consumer_queue, user_data_filename))
+            producer.daemon = True
+            producer.start()
+            self.producers.append(producer)
 
         # Create the consumer in the same process for retrieving responses async.
         self.consumer = threading.Thread(target=self.consumer_main, args=(self.consumer_queue,))
@@ -390,8 +399,10 @@ class EmbeddedProxy:
         for content in all_content:
             self.add_callback("consumer_vote_" + content.name, lambda ret: callback(ret[0], ret[1]), 1)
 
-        # Add the command to the producer queue.
-        self.add_command("producer_vote", upvote, all_content)
+        # Try to evenly distribute the command across the available producers.
+        size = math.ceil(len(all_content) / self.producer_processes)
+        for x in range(0, len(all_content), size):
+            self.add_command("producer_vote", upvote, all_content[x:x + size])
 
     def producer_vote(self, upvote, all_content):
         """
@@ -408,12 +419,13 @@ class RedditProxy(RedditClient, EmbeddedProxy):
     A proxy for interacting with the RedditClient in another process.
     """
 
-    def __init__(self, user_data_filename):
+    def __init__(self, user_data_filename, producer_processes):
         """
         Initializes a new instance of the RedditProxy class.
         :param user_data_filename: The file that contains previously entered user data.
+        :param producer_processes: The number of producer processes to make reddit requests with.
         """
-        object.__setattr__(self, "_obj", EmbeddedProxy(user_data_filename))
+        object.__setattr__(self, "_obj", EmbeddedProxy(user_data_filename, producer_processes))
 
     def __getattribute__(self, name):
         """

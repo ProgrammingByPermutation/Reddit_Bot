@@ -1,8 +1,8 @@
 import tkinter
+
 import gui
-import reddit_client
-import praw
 import logger
+import reddit_client
 from constants import *
 
 
@@ -116,7 +116,8 @@ def on_get_post(post):
     main_form.results.add_title("COMMENTS")
     if post.all_comments is not None:
         for comment in post.all_comments:
-            comment.control = main_form.results.add_content(str(comment))
+            content = main_form.results.add_content(str(comment))
+            content.id = comment.name
     else:
         main_form.results.add_content("No comments!")
 
@@ -237,7 +238,7 @@ if __name__ == "__main__":
     main_form.button_execute.configure(command=on_button_execute_click)
 
     # Create reddit client
-    reddit = reddit_client.RedditProxy(user_data_file)
+    reddit = reddit_client.RedditProxy(user_data_file, 5)
     reddit.add_callback("is_logged_in", on_is_logged_in)
     reddit.add_callback("login_first_time", on_login_first_time)
     reddit.is_logged_in()
