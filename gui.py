@@ -1,5 +1,5 @@
-from tkinter import *
 from enum import Enum
+from tkinter import *
 
 
 def setup_resizable(control):
@@ -157,6 +157,16 @@ class ScrollableControlBecauseTkinterIsAShitTechnology(Frame):
 
     def __init__(self, root):
         Frame.__init__(self, root)
+        self.canvas = None
+        self.vsb = None
+        self.frame = None
+        self.frame_id = None
+        self.create_controls()
+
+    def create_controls(self):
+        """
+        Creates all the sub-controls of this control.
+        """
         self.canvas = Canvas(self, borderwidth=0)
         self.canvas.grid(row=0, sticky=N + S + E + W)
         self.canvas.bind("<Configure>", self.on_canvas_resize)
@@ -168,7 +178,6 @@ class ScrollableControlBecauseTkinterIsAShitTechnology(Frame):
         self.frame = Frame(self.canvas)
         self.frame_id = self.canvas.create_window((4, 4), window=self.frame, anchor="nw")
         self.frame.bind("<Configure>", self.on_frame_resize)
-
         setup_resizable(self.frame)
 
     def add_title(self, text):
@@ -212,12 +221,19 @@ class ScrollableControlBecauseTkinterIsAShitTechnology(Frame):
         """
         Clears the panel of all added controls.
         """
+        if self.vsb is not None:
+            self.vsb.destroy()
+            self.vsb = None
+
         if self.frame is not None:
             self.frame.destroy()
+            self.frame = None
 
-        self.frame = Frame(self.canvas)
-        self.frame_id = self.canvas.create_window((4, 4), window=self.frame, anchor="nw")
-        self.frame.bind("<Configure>", self.on_frame_resize)
+        if self.canvas is not None:
+            self.canvas.destroy()
+            self.canvas = None
+
+        self.create_controls()
 
     def on_frame_resize(self, event):
         """

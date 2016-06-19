@@ -401,6 +401,9 @@ class EmbeddedProxy:
 
         # Try to evenly distribute the command across the available producers.
         size = math.ceil(len(all_content) / self.producer_processes)
+        if size <= 0:
+            return
+
         for x in range(0, len(all_content), size):
             self.add_command("producer_vote", upvote, all_content[x:x + size])
 

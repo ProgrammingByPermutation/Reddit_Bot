@@ -83,19 +83,17 @@ def on_get_user(user):
 
     # Write all the posts to the screen.
     main_form.results.add_title("POSTS")
-    if user.posts is not None:
+    if user.posts is not None and len(user.posts) > 0:
         for post in user.posts:
-            content = main_form.results.add_content(str(post))
-            content.id = post.name
+            create_result_control(post)
     else:
         main_form.results.add_content("No posts!")
 
     # Write all the comments to the screen.
     main_form.results.add_title("COMMENTS")
-    if user.all_comments is not None:
+    if user.all_comments is not None and len(user.all_comments) > 0:
         for comment in user.all_comments:
-            content = main_form.results.add_content(str(comment))
-            content.id = comment.name
+            create_result_control(comment)
     else:
         main_form.results.add_content("No comments!")
 
@@ -114,14 +112,26 @@ def on_get_post(post):
 
     # Write all comments to the screen.
     main_form.results.add_title("COMMENTS")
-    if post.all_comments is not None:
+    if post.all_comments is not None and len(post.all_comments) > 0:
         for comment in post.all_comments:
-            content = main_form.results.add_content(str(comment))
-            content.id = comment.name
+            create_result_control(comment)
     else:
         main_form.results.add_content("No comments!")
 
     enable_actions()
+
+
+def create_result_control(result):
+    """
+    Creates a new result control.
+    :param result: The result to make a control of.
+    :return: The new control.
+    """
+    content = main_form.results.add_content(str(result))
+    content.id = result.name
+
+    if result.archived:
+        content.configure(bg="cyan")
 
 
 def on_vote(entry, success):
@@ -180,14 +190,14 @@ def on_execute_user(user):
 
     on_get_user(user)
     if main_form.radiobutton_action.get() == gui.Action.Upvote.value:
-        reddit.vote(True, user.posts, on_vote)
-        reddit.vote(True, user.all_comments, on_vote)
+        reddit.vote(True, [post for post in user.posts if not post.archived], on_vote)
+        reddit.vote(True, [comment for comment in user.all_comments if not comment.archived], on_vote)
     elif main_form.radiobutton_action.get() == gui.Action.Downvote.value:
-        reddit.vote(False, user.posts, on_vote)
-        reddit.vote(False, user.all_comments, on_vote)
+        reddit.vote(False, [post for post in user.posts if not post.archived], on_vote)
+        reddit.vote(False, [comment for comment in user.all_comments if not comment.archived], on_vote)
     elif main_form.radiobutton_action.get() == gui.Action.Clear.value:
-        reddit.vote(None, user.posts, on_vote)
-        reddit.vote(None, user.all_comments, on_vote)
+        reddit.vote(None, [post for post in user.posts if not post.archived], on_vote)
+        reddit.vote(None, [comment for comment in user.all_comments if not comment.archived], on_vote)
 
 
 def on_execute_post(post):
@@ -202,11 +212,11 @@ def on_execute_post(post):
 
     on_get_post(post)
     if main_form.radiobutton_action.get() == gui.Action.Upvote.value:
-        reddit.vote(True, post.all_comments, on_vote)
+        reddit.vote(True, [post for post in post.all_comments if not post.archived], on_vote)
     elif main_form.radiobutton_action.get() == gui.Action.Downvote.value:
-        reddit.vote(False, post.all_comments, on_vote)
+        reddit.vote(False, [post for post in post.all_comments if not post.archived], on_vote)
     elif main_form.radiobutton_action.get() == gui.Action.Clear.value:
-        reddit.vote(None, post.all_comments, on_vote)
+        reddit.vote(None, [post for post in post.all_comments if not post.archived], on_vote)
 
 
 def disable_actions():
